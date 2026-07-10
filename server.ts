@@ -206,6 +206,19 @@ async function startServer() {
     }
   });
 
+  // Search games
+  app.get('/api/search-games', async (req: any, res: any) => {
+    const { q } = req.query;
+    if (!q) return res.json([]);
+    try {
+      const searchRes = await axios.get(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&l=english&cc=US`);
+      res.json(searchRes.data?.items || []);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Search failed" });
+    }
+  });
+
   // Gemini Recommendations
   app.post('/api/recommendations', checkAuth, async (req: any, res: any) => {
     const { ownedGames, recentGames, customGeminiKey, preferences } = req.body;
@@ -270,16 +283,129 @@ async function startServer() {
       };
 
       try {
-        const response = await generate("gemini-3.5-flash");
-        res.json(JSON.parse(response.text));
-      } catch (geminiError: any) {
-        if (geminiError.status === 503 || geminiError.message?.includes('503')) {
-          console.log("[Gemini Fallback] 3.5-flash failed with 503, trying 3.1-pro-preview");
-          const fallbackResponse = await generate("gemini-3.1-pro-preview");
-          res.json(JSON.parse(fallbackResponse.text));
-        } else {
-          throw geminiError;
+        let responseText = "";
+        try {
+          const response = await generate("gemini-3.5-flash");
+          responseText = response.text;
+        } catch (geminiError: any) {
+          if (geminiError.status === 503 || geminiError.message?.includes('503')) {
+            console.log("[Gemini Fallback] 3.5-flash failed with 503, trying 3.1-pro-preview");
+            const fallbackResponse = await generate("gemini-3.1-pro-preview");
+            responseText = fallbackResponse.text;
+          } else {
+            throw geminiError;
+          }
         }
+
+        const result = JSON.parse(responseText);
+
+        // Fetch real App IDs
+        for (const rec of result.recommendations) {
+          try {
+            const searchRes = await axios.get(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(rec.name)}&l=english&cc=US`);
+            if (searchRes.data && searchRes.data.items && searchRes.data.items.length > 0) {
+              rec.appId = searchRes.data.items[0].id;
+              rec.name = searchRes.data.items[0].name; // use exact name
+            }
+          } catch (e) {
+             console.error("Failed to fetch real app ID for", rec.name);
+          }
+        }
+
+        res.json(result);
+      } catch (error: any) {
+        console.error("Gemini Error:", error.message);
+        res.status(500).json({ error: "Ocorreu um erro ao gerar recomendações. Tente novamente mais tarde." });
+      }
+    } catch (error: any) {
+      console.error("Outer Error:", error.message);
+      res.status(500).json({ error: "Ocorreu um erro. Tente novamente mais tarde." });
+    }
+  });
+
+  // Similar Game Recommendations
+  app.post('/api/recommend-similar', checkAuth, async (req: any, res: any) => {
+    const { gameName, customGeminiKey } = req.body;
+
+    try {
+      let activeAi = ai;
+      if (customGeminiKey) {
+        activeAi = new GoogleGenAI({ apiKey: customGeminiKey });
+      }
+
+      const prompt = `
+        O usuário quer recomendações de jogos parecidos com "${gameName}".
+        
+        Instruções:
+        1. Recomende 5 jogos que sejam muito semelhantes a "${gameName}" em termos de gênero, estilo de arte, ou mecânicas de gameplay.
+        2. Explique por que cada jogo foi recomendado e o que ele tem em comum com "${gameName}".
+        3. Retorne APENAS um JSON estruturado com os App IDs oficiais da Steam para cada jogo.
+      `;
+
+      const generate = async (modelName: string) => {
+        return await activeAi.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                recommendations: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      appId: { type: Type.INTEGER, description: "Steam App ID for the game" },
+                      reason: { type: Type.STRING },
+                      genres: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      estimatedMatch: { type: Type.NUMBER, description: "0-100 percentage" }
+                    },
+                    required: ["name", "appId", "reason", "genres", "estimatedMatch"]
+                  }
+                }
+              },
+              required: ["recommendations"]
+            }
+          }
+        });
+      };
+
+      try {
+        let responseText = "";
+        try {
+          const response = await generate("gemini-3.5-flash");
+          responseText = response.text;
+        } catch (geminiError: any) {
+          if (geminiError.status === 503 || geminiError.message?.includes('503')) {
+            console.log("[Gemini Fallback] 3.5-flash failed with 503, trying 3.1-pro-preview");
+            const fallbackResponse = await generate("gemini-3.1-pro-preview");
+            responseText = fallbackResponse.text;
+          } else {
+            throw geminiError;
+          }
+        }
+
+        const result = JSON.parse(responseText);
+
+        // Fetch real App IDs
+        for (const rec of result.recommendations) {
+          try {
+            const searchRes = await axios.get(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(rec.name)}&l=english&cc=US`);
+            if (searchRes.data && searchRes.data.items && searchRes.data.items.length > 0) {
+              rec.appId = searchRes.data.items[0].id;
+              rec.name = searchRes.data.items[0].name; // use exact name
+            }
+          } catch (e) {
+             console.error("Failed to fetch real app ID for", rec.name);
+          }
+        }
+
+        res.json(result);
+      } catch (error: any) {
+        console.error("Gemini Error:", error.message);
+        res.status(500).json({ error: "Ocorreu um erro ao gerar recomendações. Tente novamente mais tarde." });
       }
     } catch (error: any) {
       console.error("Gemini Error:", error.message);

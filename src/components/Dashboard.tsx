@@ -27,6 +27,8 @@ export default function Dashboard({ user }: { user: User }) {
   const [ownedGames, setOwnedGames] = useState<Game[]>([]);
   const [recentGames, setRecentGames] = useState<Game[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [discardedRecommendations, setDiscardedRecommendations] = useState<Recommendation[]>([]);
+  const [activeTab, setActiveTab] = useState<'recommendations' | 'library' | 'discarded'>('recommendations');
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -35,6 +37,10 @@ export default function Dashboard({ user }: { user: User }) {
   const [prefsMoreOf, setPrefsMoreOf] = useState('');
   const [prefsLessOf, setPrefsLessOf] = useState('');
   const [generationError, setGenerationError] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -122,7 +128,82 @@ export default function Dashboard({ user }: { user: User }) {
   };
 
   const handleDiscard = (index: number) => {
-    setRecommendations(prev => prev.filter((_, i) => i !== index));
+    setRecommendations(prev => {
+      const updated = [...prev];
+      const [discarded] = updated.splice(index, 1);
+      setDiscardedRecommendations(d => [...d, discarded]);
+      return updated;
+    });
+  };
+
+  const handleRestore = (index: number) => {
+    setDiscardedRecommendations(prev => {
+      const updated = [...prev];
+      const [restored] = updated.splice(index, 1);
+      setRecommendations(r => [...r, restored]);
+      return updated;
+    });
+  };
+
+  const handleSearchGames = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/search-games?q=${encodeURIComponent(searchQuery)}`);
+      const data = await res.json();
+      setSearchResults(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleAddGame = (app: any) => {
+    if (!ownedGames.some(g => g.appid === app.id)) {
+      const newGame: Game = {
+        appid: app.id,
+        name: app.name,
+        playtime_forever: 0,
+        img_icon_url: '' // We don't have this from search easily, but it's okay
+      };
+      setOwnedGames(prev => [newGame, ...prev]);
+    }
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const handleRecommendSimilar = async (gameName: string) => {
+    setActiveTab('recommendations');
+    setGenerating(true);
+    setGenerationError('');
+    try {
+      const token = localStorage.getItem('steam_auth_token');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/recommend-similar', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          gameName,
+          customGeminiKey: customApiKey || undefined
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRecommendations(data.recommendations || []);
+      } else {
+        setGenerationError(data.error || 'Erro ao gerar recomendações similares.');
+      }
+    } catch (err) {
+      console.error(err);
+      setGenerationError('Erro de conexão.');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   if (loading) {
@@ -225,87 +306,294 @@ export default function Dashboard({ user }: { user: User }) {
           </div>
         )}
 
-        {/* Hero Section */}
-        <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900 p-8 sm:p-12">
-          <div className="relative z-10 max-w-2xl space-y-6">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full text-xs font-bold backdrop-blur-sm"
-            >
-              <Sparkles className="w-3 h-3" />
-              POWERED BY GEMINI AI
-            </motion.div>
-            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight">O que vamos jogar hoje?</h2>
-            <p className="text-blue-100/80 text-lg">
-              Analisamos seus {ownedGames.length} jogos e seu histórico recente para encontrar o par perfeito para seu estilo.
-            </p>
-            
-            <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/10">
-              <h3 className="text-sm font-semibold text-white/90 uppercase tracking-wider">Refinar Buscas (Opcional)</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-blue-200 mb-1">Quero jogar MAIS disso:</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: RPG, Terror, Mundo Aberto"
-                    value={prefsMoreOf}
-                    onChange={(e) => setPrefsMoreOf(e.target.value)}
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-400 placeholder-white/30"
-                  />
+        <div className="flex space-x-1 border-b border-white/10 overflow-x-auto pb-1 mb-8">
+          <button
+            onClick={() => setActiveTab('recommendations')}
+            className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
+              activeTab === 'recommendations' 
+                ? 'text-white border-b-2 border-blue-500 bg-blue-500/10' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Recomendações
+          </button>
+          <button
+            onClick={() => setActiveTab('library')}
+            className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
+              activeTab === 'library' 
+                ? 'text-white border-b-2 border-blue-500 bg-blue-500/10' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Biblioteca ({ownedGames.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('discarded')}
+            className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
+              activeTab === 'discarded' 
+                ? 'text-white border-b-2 border-blue-500 bg-blue-500/10' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Descartados ({discardedRecommendations.length})
+          </button>
+        </div>
+
+        {activeTab === 'recommendations' && (
+          <div className="space-y-12">
+            {/* Hero Section */}
+            <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900 p-8 sm:p-12">
+              <div className="relative z-10 max-w-2xl space-y-6">
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full text-xs font-bold backdrop-blur-sm"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  POWERED BY GEMINI AI
+                </motion.div>
+                <h2 className="text-3xl sm:text-5xl font-bold tracking-tight">O que vamos jogar hoje?</h2>
+                <p className="text-blue-100/80 text-lg">
+                  Analisamos seus {ownedGames.length} jogos e seu histórico recente para encontrar o par perfeito para seu estilo.
+                </p>
+                
+                <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <h3 className="text-sm font-semibold text-white/90 uppercase tracking-wider">Refinar Buscas (Opcional)</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-blue-200 mb-1">Quero jogar MAIS disso:</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ex: RPG, Terror, Mundo Aberto"
+                        value={prefsMoreOf}
+                        onChange={(e) => setPrefsMoreOf(e.target.value)}
+                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-400 placeholder-white/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-blue-200 mb-1">Quero jogar MENOS disso:</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ex: Puzzle, FPS, Esportes"
+                        value={prefsLessOf}
+                        onChange={(e) => setPrefsLessOf(e.target.value)}
+                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-400 placeholder-white/30"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-blue-200 mb-1">Quero jogar MENOS disso:</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: Puzzle, FPS, Esportes"
-                    value={prefsLessOf}
-                    onChange={(e) => setPrefsLessOf(e.target.value)}
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-400 placeholder-white/30"
-                  />
-                </div>
+
+                <button
+                  onClick={generateRecommendations}
+                  disabled={generating || (ownedGames.length === 0 && recentGames.length === 0 && !prefsMoreOf)}
+                  className="flex items-center gap-2 bg-white text-blue-900 font-bold py-3 px-8 rounded-xl hover:bg-blue-50 transition-all disabled:opacity-50 active:scale-95 mt-4"
+                >
+                  {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                  {generating ? 'Analisando perfil...' : 'Gerar Recomendações'}
+                </button>
+
+                {generationError && (
+                  <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 rounded-xl flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-200">{generationError}</p>
+                  </div>
+                )}
               </div>
+              
+              {/* Abstract decoration */}
+              <div className="absolute top-0 right-0 w-1/2 h-full bg-white/5 -skew-x-12 transform origin-top translate-x-1/4 pointer-events-none" />
+            </section>
+
+            {/* Recommendations Section */}
+            <AnimatePresence mode="wait">
+              {recommendations.length > 0 && (
+                <motion.section
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="space-y-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                      Especialmente para você
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <AnimatePresence>
+                      {recommendations.map((rec: any, i) => (
+                        <motion.div key={rec.name} layout>
+                          <GameCard 
+                            name={rec.name}
+                            appId={rec.appId}
+                            reason={rec.reason}
+                            match={rec.estimatedMatch}
+                            genres={rec.genres}
+                            onDiscard={() => handleDiscard(i)}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+
+            {/* History Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <section className="lg:col-span-2 space-y-6">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <History className="w-5 h-5 text-blue-400" />
+                  Jogados Recentemente
+                </h3>
+                
+                {recentGames.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {recentGames.slice(0, 4).map((game) => (
+                      <div key={game.appid} className="flex items-center gap-4 bg-[#161f35] p-4 rounded-2xl border border-white/5 hover:bg-[#1a2540] transition-colors cursor-pointer" onClick={() => handleRecommendSimilar(game.name)} title="Ver similares">
+                         <div className="w-14 h-14 bg-black/30 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                          {game.img_icon_url ? (
+                            <img src={`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} alt={game.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Gamepad2 className="w-6 h-6 text-blue-400/30" />
+                          )}
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <h4 className="font-semibold text-base truncate text-gray-100 group-hover:text-white transition-colors">{game.name}</h4>
+                           <p className="text-sm text-blue-400 font-medium">
+                             {game.playtime_2weeks ? `${(game.playtime_2weeks / 60).toFixed(1)}h` : '< 1h'} <span className="text-gray-500 text-xs font-normal">nas últimas 2 semanas</span>
+                           </p>
+                         </div>
+                         <ChevronRight className="w-5 h-5 text-gray-600" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-[#161f35] border border-white/5 p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-4">
+                    <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
+                      <Gamepad2 className="w-8 h-8 text-blue-400/50" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-300">Nenhuma atividade recente</h4>
+                      <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+                        {isProfilePrivate 
+                          ? "Parece que seu perfil está privado. Torne-o público para visualizarmos."
+                          : "Você não jogou nada nas últimas duas semanas, ou seus dados de jogo estão privados na Steam."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </section>
+              <section className="space-y-6">
+                <h3 className="text-xl font-bold">Resumo da Biblioteca</h3>
+                <div className="bg-[#161f35] p-6 rounded-3xl border border-white/5 space-y-6">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm">Total de Jogos</span>
+                    <span className="text-2xl font-bold text-blue-400">{ownedGames.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mais Jogados</p>
+                    <div className="space-y-3">
+                      {ownedGames
+                        .sort((a, b) => b.playtime_forever - a.playtime_forever)
+                        .slice(0, 3)
+                        .map(game => (
+                          <div key={game.appid} className="flex justify-between items-center text-sm cursor-pointer group hover:bg-white/5 p-1 -mx-1 rounded" onClick={() => handleRecommendSimilar(game.name)} title="Ver similares">
+                            <span className="text-gray-300 truncate max-w-[150px] group-hover:text-blue-400 transition-colors">{game.name}</span>
+                            <span className="text-gray-500 font-mono text-xs">{Math.round(game.playtime_forever / 60)}h</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'library' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <h3 className="text-xl font-bold">Todos os Jogos ({ownedGames.length})</h3>
+              
+              <form onSubmit={handleSearchGames} className="flex w-full sm:w-auto gap-2">
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Adicionar jogo manualmente..."
+                  className="bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 flex-1 sm:w-64"
+                />
+                <button 
+                  type="submit"
+                  disabled={searching || !searchQuery}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                >
+                  Buscar
+                </button>
+              </form>
             </div>
 
-            <button
-              onClick={generateRecommendations}
-              disabled={generating || (ownedGames.length === 0 && recentGames.length === 0)}
-              className="flex items-center gap-2 bg-white text-blue-900 font-bold py-3 px-8 rounded-xl hover:bg-blue-50 transition-all disabled:opacity-50 active:scale-95 mt-4"
-            >
-              {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-              {generating ? 'Analisando perfil...' : 'Gerar Recomendações'}
-            </button>
-
-            {generationError && (
-              <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 rounded-xl flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-red-200">{generationError}</p>
+            {searchResults.length > 0 && (
+              <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-3">
+                <h4 className="text-sm font-semibold text-gray-300">Resultados da busca:</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {searchResults.map(app => (
+                    <div key={app.id} className="flex justify-between items-center bg-black/20 p-2 rounded-lg">
+                      <span className="text-sm truncate mr-2">{app.name}</span>
+                      <button 
+                        onClick={() => handleAddGame(app)}
+                        className="bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 px-3 py-1 rounded text-xs font-semibold transition-colors"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
-          
-          {/* Abstract decoration */}
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-white/5 -skew-x-12 transform origin-top translate-x-1/4 pointer-events-none" />
-        </section>
 
-        {/* Recommendations Section */}
-        <AnimatePresence mode="wait">
-          {recommendations.length > 0 && (
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-yellow-400" />
-                  Especialmente para você
-                </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {ownedGames
+                .sort((a, b) => b.playtime_forever - a.playtime_forever)
+                .map(game => (
+                  <div 
+                    key={game.appid} 
+                    className="bg-[#161f35] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all group"
+                    onClick={() => handleRecommendSimilar(game.name)}
+                    title="Encontrar similares"
+                  >
+                    <div className="w-16 h-16 bg-black/30 rounded-xl flex items-center justify-center overflow-hidden mb-3">
+                      {game.img_icon_url ? (
+                        <img src={`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} alt={game.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Gamepad2 className="w-8 h-8 text-blue-400/30" />
+                      )}
+                    </div>
+                    <span className="font-semibold text-gray-200 text-sm group-hover:text-blue-400 transition-colors">{game.name}</span>
+                    {game.playtime_forever > 0 && (
+                       <span className="text-xs text-gray-500 mt-1">{Math.round(game.playtime_forever / 60)}h jogadas</span>
+                    )}
+                  </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'discarded' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              <History className="w-5 h-5 text-gray-400" />
+              Recomendações Descartadas
+            </h3>
+            {discardedRecommendations.length === 0 ? (
+              <div className="bg-[#161f35] border border-white/5 p-8 rounded-3xl text-center">
+                <p className="text-gray-500">Nenhuma recomendação descartada.</p>
               </div>
+            ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <AnimatePresence>
-                  {recommendations.map((rec: any, i) => (
+                  {discardedRecommendations.map((rec: any, i) => (
                     <motion.div key={rec.name} layout>
                       <GameCard 
                         name={rec.name}
@@ -313,86 +601,18 @@ export default function Dashboard({ user }: { user: User }) {
                         reason={rec.reason}
                         match={rec.estimatedMatch}
                         genres={rec.genres}
-                        onDiscard={() => handleDiscard(i)}
+                        onDiscard={() => handleRestore(i)}
+                        discardIcon={<History className="w-4 h-4 text-blue-400" />}
+                        discardLabel="Restaurar"
                       />
                     </motion.div>
                   ))}
                 </AnimatePresence>
               </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
-
-        {/* History Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <section className="lg:col-span-2 space-y-6">
-            <h3 className="text-xl font-bold flex items-center gap-2">
-              <History className="w-5 h-5 text-blue-400" />
-              Jogados Recentemente
-            </h3>
-            
-            {recentGames.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {recentGames.slice(0, 4).map((game) => (
-                  <div key={game.appid} className="flex items-center gap-4 bg-[#161f35] p-4 rounded-2xl border border-white/5 hover:bg-[#1a2540] transition-colors">
-                     <div className="w-14 h-14 bg-black/30 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
-                      {game.img_icon_url ? (
-                        <img src={`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} alt={game.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Gamepad2 className="w-6 h-6 text-blue-400/30" />
-                      )}
-                     </div>
-                     <div className="flex-1 min-w-0">
-                       <h4 className="font-semibold text-base truncate text-gray-100">{game.name}</h4>
-                       <p className="text-sm text-blue-400 font-medium">
-                         {game.playtime_2weeks ? `${(game.playtime_2weeks / 60).toFixed(1)}h` : '< 1h'} <span className="text-gray-500 text-xs font-normal">nas últimas 2 semanas</span>
-                       </p>
-                     </div>
-                     <ChevronRight className="w-5 h-5 text-gray-600" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-[#161f35] border border-white/5 p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
-                  <Gamepad2 className="w-8 h-8 text-blue-400/50" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-300">Nenhuma atividade recente</h4>
-                  <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
-                    {isProfilePrivate 
-                      ? "Parece que seu perfil está privado. Torne-o público para visualizarmos."
-                      : "Você não jogou nada nas últimas duas semanas, ou seus dados de jogo estão privados na Steam."}
-                  </p>
-                </div>
-              </div>
             )}
-          </section>
+          </div>
+        )}
 
-          <section className="space-y-6">
-            <h3 className="text-xl font-bold">Resumo da Biblioteca</h3>
-            <div className="bg-[#161f35] p-6 rounded-3xl border border-white/5 space-y-6">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400 text-sm">Total de Jogos</span>
-                <span className="text-2xl font-bold text-blue-400">{ownedGames.length}</span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mais Jogados</p>
-                <div className="space-y-3">
-                  {ownedGames
-                    .sort((a, b) => b.playtime_forever - a.playtime_forever)
-                    .slice(0, 3)
-                    .map(game => (
-                      <div key={game.appid} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-300 truncate max-w-[150px]">{game.name}</span>
-                        <span className="text-gray-500 font-mono text-xs">{Math.round(game.playtime_forever / 60)}h</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
       </main>
     </div>
   );

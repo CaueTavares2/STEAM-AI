@@ -10,9 +10,11 @@ interface GameCardProps {
   match?: number;
   genres?: string[];
   onDiscard?: () => void;
+  discardIcon?: React.ReactNode;
+  discardLabel?: string;
 }
 
-export default function GameCard({ name, image, appId, playtime, reason, match, genres, onDiscard }: GameCardProps) {
+export default function GameCard({ name, image, appId, playtime, reason, match, genres, onDiscard, discardIcon, discardLabel }: GameCardProps) {
   const imageUrl = image || (appId ? `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg` : undefined);
 
   return (
@@ -27,10 +29,10 @@ export default function GameCard({ name, image, appId, playtime, reason, match, 
       {onDiscard && (
         <button
           onClick={onDiscard}
-          className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all z-10"
-          title="Descartar recomendação"
+          className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-blue-500/80 text-white rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all z-10 flex items-center justify-center"
+          title={discardLabel || "Descartar recomendação"}
         >
-          <X className="w-4 h-4" />
+          {discardIcon || <X className="w-4 h-4" />}
         </button>
       )}
 
