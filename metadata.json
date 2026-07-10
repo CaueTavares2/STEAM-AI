@@ -1,0 +1,6 @@
+{
+  "name": "Steam IA: Recomendador de Jogos",
+  "description": "Utiliza IA para analisar seu perfil Steam e recomendar novos jogos baseados no seu histórico e reviews.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
