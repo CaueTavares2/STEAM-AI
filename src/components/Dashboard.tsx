@@ -23,7 +23,12 @@ import {
   Compass, 
   Layers,
   HelpCircle,
-  Database
+  Database,
+  Award,
+  Shield,
+  Zap,
+  Target,
+  Coffee
 } from "lucide-react";
 import GameCard from './GameCard';
 
@@ -422,6 +427,90 @@ export default function Dashboard({ user }: { user: User }) {
     return `Mecanismo Synapse conectado. Analisando ${combinedTotalGames} jogos em seu repertório (incluindo ${manualGames.length} registros manuais). Sintonize uma recomendação para encontrar seu próximo jogo!`;
   };
 
+  // Dynamic Gamer Archetype calculations based on genres of their games library (both steam and manually added)
+  const getGamerArchetype = () => {
+    const allGames = [...ownedGames, ...manualGames];
+    if (allGames.length === 0) {
+      return {
+        title: "Pioneiro da Fronteira",
+        description: "Seu link neural está dormente por enquanto. Adicione alguns jogos ou conecte seu perfil Steam para revelar sua verdadeira assinatura cibernética!",
+        metrics: { focus: 25, tactic: 25, explore: 25, cozy: 25 },
+        colorClass: "from-blue-600 via-purple-600 to-amber-500",
+        accentText: "text-purple-400"
+      };
+    }
+
+    // Keyword mapping to detect core elements
+    let rpgFocus = 0;
+    let strategyTactics = 0;
+    let actionAdventure = 0;
+    let cozyCasual = 0;
+
+    allGames.forEach(game => {
+      const name = game.name.toLowerCase();
+      const weight = Math.max(1, Math.log10(game.playtime_forever / 60 || 1) * 2.2);
+
+      if (name.includes("elden") || name.includes("ring") || name.includes("souls") || name.includes("witcher") || name.includes("scrolls") || name.includes("skyrim") || name.includes("fantasy") || name.includes("cyberpunk") || name.includes("rpg") || name.includes("dragon") || name.includes("monster") || name.includes("persona") || name.includes("fallout") || name.includes("baldurs") || name.includes("gate") || name.includes("final") || name.includes("diablo")) {
+        rpgFocus += 10 * weight;
+      }
+      if (name.includes("civilization") || name.includes("total war") || name.includes("crusader") || name.includes("hearts of") || name.includes("age of") || name.includes("starcraft") || name.includes("dota") || name.includes("league") || name.includes("tactics") || name.includes("chess") || name.includes("manager") || name.includes("sim") || name.includes("tycoon") || name.includes("factorio") || name.includes("cities") || name.includes("rimworld")) {
+        strategyTactics += 10 * weight;
+      }
+      if (name.includes("counter") || name.includes("strike") || name.includes("cs:") || name.includes("call of") || name.includes("duty") || name.includes("halo") || name.includes("doom") || name.includes("borderlands") || name.includes("grand theft") || name.includes("gta") || name.includes("resident") || name.includes("evil") || name.includes("dead") || name.includes("hades") || name.includes("dead cells") || name.includes("cyber") || name.includes("combat") || name.includes("battlefield") || name.includes("apex") || name.includes("fortnite")) {
+        actionAdventure += 10 * weight;
+      }
+      if (name.includes("stardew") || name.includes("valley") || name.includes("animal") || name.includes("crossing") || name.includes("minecraft") || name.includes("terrar") || name.includes("cozy") || name.includes("sims") || name.includes("lego") || name.includes("overcooked") || name.includes("fall guys") || name.includes("subnautica") || name.includes("portal") || name.includes("slay the spire") || name.includes("farm") || name.includes("harvest") || name.includes("slime")) {
+        cozyCasual += 10 * weight;
+      }
+    });
+
+    const totalPoints = rpgFocus + strategyTactics + actionAdventure + cozyCasual;
+    
+    let rPct = 25, sPct = 25, aPct = 25, cPct = 25;
+    if (totalPoints > 0) {
+      rPct = Math.round((rpgFocus / totalPoints) * 100);
+      sPct = Math.round((strategyTactics / totalPoints) * 100);
+      aPct = Math.round((actionAdventure / totalPoints) * 100);
+      cPct = Math.round((cozyCasual / totalPoints) * 100);
+    }
+
+    const maxVal = Math.max(rPct, sPct, aPct, cPct);
+
+    if (maxVal === rPct) {
+      return {
+        title: "Conquistador de Mundos (RPG)",
+        description: "Você respira fantasia e narrativas imersivas. Suas escolhas moldam heróis e reinos, otimizando builds ultra complexas em mundos fascinantes.",
+        metrics: { focus: rPct, tactic: sPct, explore: aPct, cozy: cPct },
+        colorClass: "from-amber-500 via-purple-600 to-blue-500",
+        accentText: "text-amber-400"
+      };
+    } else if (maxVal === sPct) {
+      return {
+        title: "Estrategista de Elite",
+        description: "Decisões calculadas, logística infalível e mentes frias. Seja erguendo impérios ou otimizando fábricas de automação, sua maior arma é o intelecto.",
+        metrics: { focus: rPct, tactic: sPct, explore: aPct, cozy: cPct },
+        colorClass: "from-blue-500 via-indigo-600 to-purple-500",
+        accentText: "text-blue-400"
+      };
+    } else if (maxVal === aPct) {
+      return {
+        title: "Predador do Caos (Ação & Reflexos)",
+        description: "Velocidade pura, adrenalina constante e precisão absoluta. Você brilha em combates ágeis, tiroteios viscerais e na maestria de reflexos.",
+        metrics: { focus: rPct, tactic: sPct, explore: aPct, cozy: cPct },
+        colorClass: "from-purple-600 via-fuchsia-500 to-amber-500",
+        accentText: "text-purple-400"
+      };
+    } else {
+      return {
+        title: "Arquiteto do Zen (Cozy Explorer)",
+        description: "Seu foco é relaxar, progredir sem pressão e expressar sua criatividade. Mundos aconchegantes e tarefas ritmadas são sua verdadeira terapia.",
+        metrics: { focus: rPct, tactic: sPct, explore: aPct, cozy: cPct },
+        colorClass: "from-yellow-400 via-amber-500 to-purple-600",
+        accentText: "text-yellow-400"
+      };
+    }
+  };
+
   // Combined library games (Steam + Manually added)
   const combinedLibraryGames = [
     ...ownedGames.map(g => ({ ...g, isManual: false })),
@@ -439,56 +528,56 @@ export default function Dashboard({ user }: { user: User }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#07070a] flex flex-col items-center justify-center space-y-4">
+      <div className="min-h-screen bg-[#14100e] flex flex-col items-center justify-center space-y-4">
         <div className="relative flex items-center justify-center">
-          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <Cpu className="w-6 h-6 text-purple-400 absolute animate-pulse" />
+          <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <Coffee className="w-6 h-6 text-amber-400 absolute animate-bounce" />
         </div>
-        <p className="text-purple-400 font-mono text-xs tracking-widest uppercase animate-pulse">Estabelecendo Link Neural... ♪</p>
+        <p className="text-amber-300 font-mono text-xs tracking-widest uppercase animate-pulse">Passando o café e organizando sua estante... ☕✨</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#07070a] text-gray-100 font-sans pb-16 relative">
+    <div className="min-h-screen bg-[#14100e] text-[#f4efe9] font-sans pb-16 relative">
       {/* Structural ambient styling grids */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#a855f702_1px,transparent_1px),linear-gradient(to_bottom,#a855f702_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(217,119,6,0.02),transparent_70%)] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[550px] h-[550px] bg-gradient-to-br from-amber-600/5 via-orange-500/5 to-transparent rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-gradient-to-tr from-orange-600/5 via-yellow-500/5 to-transparent rounded-full blur-[120px] pointer-events-none" />
 
       {/* Main Header */}
-      <header className="border-b border-purple-500/10 bg-[#0f0f16]/60 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-amber-500/10 bg-[#201815]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-tr from-purple-600 to-cyan-400 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <Cpu className="w-4.5 h-4.5 text-white" />
+            <div className="w-9 h-9 bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Coffee className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-black text-sm tracking-widest uppercase bg-gradient-to-r from-purple-400 to-cyan-300 bg-clip-text text-transparent">
+              <h1 className="font-bold text-sm sm:text-base tracking-widest uppercase bg-gradient-to-r from-amber-300 via-orange-300 to-yellow-300 bg-clip-text text-transparent font-serif">
                 Steam Synapse
               </h1>
-              <p className="text-[9px] font-mono text-purple-400/80 -mt-0.5 tracking-wider uppercase">AI Gaming Engine</p>
+              <p className="text-[9px] font-mono text-amber-400/80 -mt-0.5 tracking-widest uppercase">Seu Canto de Curadoria ☕</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             {/* User Profile */}
-            <div className="flex items-center gap-3 bg-[#07070a]/60 border border-purple-500/10 px-3.5 py-1.5 rounded-full">
+            <div className="flex items-center gap-3 bg-[#201815]/60 border border-amber-500/15 px-3.5 py-1.5 rounded-full">
               {user.photos && user.photos[0] ? (
-                <img src={user.photos[0].value} alt={user.displayName} className="w-6 h-6 rounded-full border border-purple-500/30" />
+                <img src={user.photos[0].value} alt={user.displayName} className="w-6 h-6 rounded-full border border-amber-500/30" />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center">
-                  <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
+                <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
                 </div>
               )}
-              <span className="text-xs font-bold text-gray-200 hidden sm:inline">{user.displayName}</span>
+              <span className="text-xs font-bold text-[#e1dbd2] hidden sm:inline">{user.displayName}</span>
             </div>
 
             {/* Config & Logout Buttons */}
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setShowSettings(!showSettings)}
-                className={`p-2 rounded-xl border transition-all cursor-pointer ${showSettings ? 'bg-purple-600/20 border-purple-400 text-purple-300' : 'bg-[#0f0f16] border-purple-500/10 text-gray-400 hover:text-purple-400'}`}
+                className={`p-2 rounded-xl border transition-all cursor-pointer ${showSettings ? 'bg-amber-600/20 border-amber-400 text-amber-300' : 'bg-[#201815] border-amber-500/10 text-gray-400 hover:text-amber-400'}`}
                 title="Configurações de API"
               >
                 <Settings className="w-4 h-4" />
@@ -496,7 +585,7 @@ export default function Dashboard({ user }: { user: User }) {
               
               <button 
                 onClick={handleLogout}
-                className="p-2 rounded-xl bg-[#0f0f16] border border-red-500/15 text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+                className="p-2 rounded-xl bg-[#201815] border border-red-500/15 text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
                 title="Desconectar da Steam"
               >
                 <LogOut className="w-4 h-4" />
@@ -515,15 +604,15 @@ export default function Dashboard({ user }: { user: User }) {
               initial={{ opacity: 0, height: 0, y: -10 }}
               animate={{ opacity: 1, height: 'auto', y: 0 }}
               exit={{ opacity: 0, height: 0, y: -10 }}
-              className="bg-[#0f0f16]/90 border border-purple-500/15 rounded-3xl p-6 shadow-xl space-y-4 overflow-hidden"
+              className="bg-[#201815]/95 border border-amber-500/20 rounded-3xl p-6 shadow-xl space-y-4 overflow-hidden"
             >
               <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                <Key className="w-5 h-5 text-purple-400" />
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-purple-200">Gabinete de Credenciais</h3>
+                <Key className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-amber-200">Ajustes de Chave de API</h3>
               </div>
               
               <div className="max-w-xl space-y-3">
-                <p className="text-xs text-gray-400 leading-relaxed">
+                <p className="text-xs text-amber-100/60 leading-relaxed">
                   Por padrão, utilizamos uma chave corporativa do Gemini. Se preferir rodar sob sua própria cota ou encontrar limites de requisição, você pode inserir sua chave pessoal do Google Gemini abaixo. Ela é salva estritamente no seu navegador.
                 </p>
                 <div className="flex gap-2">
@@ -532,7 +621,7 @@ export default function Dashboard({ user }: { user: User }) {
                     value={customApiKey}
                     onChange={(e) => handleSaveApiKey(e.target.value)}
                     placeholder="Chave de API do Gemini..."
-                    className="flex-1 bg-[#07070a] border border-purple-500/10 rounded-xl px-4 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-400 font-mono"
+                    className="flex-1 bg-[#14100e] border border-amber-500/15 rounded-xl px-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 font-mono"
                   />
                   {customApiKey && (
                     <button 
@@ -548,7 +637,74 @@ export default function Dashboard({ user }: { user: User }) {
           )}
         </AnimatePresence>
 
-        {/* Private Profile Warning Banner */}
+        {/* Modern Intro / Value Proposition Hero Banner */}
+        <section className="relative overflow-hidden bg-gradient-to-br from-[#201815]/95 via-[#14100e]/95 to-[#14100e]/95 border border-amber-500/15 rounded-[32px] p-6 sm:p-8 shadow-2xl">
+          {/* Neon background decorations */}
+          <div className="absolute -top-12 -left-12 w-48 h-48 bg-amber-600/10 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-orange-600/10 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(217,119,6,0.02),transparent_50%)] pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-12">
+            <div className="space-y-4 max-w-3xl text-center md:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/20 rounded-full text-xs font-bold font-mono text-amber-300 uppercase tracking-widest">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                Curadoria Acolhedora via IA
+              </div>
+              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight font-serif">
+                Sua biblioteca sintonizada no <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 bg-clip-text text-transparent italic">ritmo mais aconchegante</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-amber-100/75 leading-relaxed">
+                O <strong className="text-amber-300">Steam Synapse</strong> analisa gentilmente sua biblioteca de jogos e tempos de jogatina para traçar seu perfil de afinidade. Se sua conta Steam for privada ou se joga em outros consoles, adicione seus títulos preferidos manualmente para alimentar nosso motor inteligente. Ajuste os filtros e projete recomendações customizadas instantaneamente.
+              </p>
+              
+              {/* Quick Pillars Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left font-sans">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                    <Target className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-bold text-amber-200 uppercase tracking-wider">Curadoria Leve</h5>
+                    <p className="text-[10px] text-amber-100/50">Chega de perder horas escolhendo o que jogar na biblioteca.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center border border-orange-500/20 text-orange-400 shrink-0 mt-0.5">
+                    <Zap className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-bold text-amber-200 uppercase tracking-wider">Afinidade Genuína</h5>
+                    <p className="text-[10px] text-amber-100/50">Sugestões baseadas nas mecânicas e estilos que você mais ama.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+                    <Shield className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-bold text-amber-200 uppercase tracking-wider">Qualquer Plataforma</h5>
+                    <p className="text-[10px] text-amber-100/50">Adicione jogos do seu Switch, PlayStation, Xbox ou PC facilmente.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cozy tea kettle visualizer */}
+            <div className="relative shrink-0 w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center group pointer-events-none hidden md:flex">
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-500 rounded-full blur opacity-30 group-hover:opacity-50 transition duration-500 animate-pulse" />
+              <div className="relative w-28 h-28 md:w-36 md:h-36 bg-[#201815]/90 rounded-full border border-amber-500/20 flex flex-col items-center justify-center text-center p-4 overflow-hidden">
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(245,158,11,0.02)_1px,transparent_1px)] bg-[size:100%_4px]" />
+                <Coffee className="w-8 h-8 text-amber-400 animate-bounce" style={{ animationDuration: '3s' }} />
+                <span className="text-[9px] font-mono text-amber-300 mt-2 uppercase tracking-widest font-bold">BULI QUENTE ☕</span>
+                <span className="text-[8px] font-mono text-amber-200/50 mt-0.5 uppercase">Model: Gemini</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Private Warning Banner */}
         {isProfilePrivate && (
           <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-amber-500/5">
             <div className="flex gap-3">
@@ -556,7 +712,7 @@ export default function Dashboard({ user }: { user: User }) {
               <div>
                 <h4 className="text-sm font-bold text-amber-300">Sua conta Steam parece Privada ou sem jogos disponíveis</h4>
                 <p className="text-xs text-amber-200/80 leading-relaxed mt-0.5">
-                  Não conseguimos importar jogos automaticamente. Torne seus "Detalhes dos Jogos" públicos na Steam ou <span className="font-bold underline text-amber-300">adicione jogos manualmente</span> na nova aba de registros para alimentar o sistema de IA!
+                  Não conseguimos importar seus jogos automaticamente. Torne seus "Detalhes dos Jogos" públicos na Steam ou <span className="font-bold underline text-amber-300">adicione jogos manualmente</span> na nova aba de registros para alimentar o sistema de IA!
                 </p>
               </div>
             </div>
@@ -572,68 +728,68 @@ export default function Dashboard({ user }: { user: User }) {
         )}
 
         {/* Primary Tab Navigation */}
-        <div className="flex border-b border-purple-500/10 overflow-x-auto pb-px gap-2 scrollbar-none">
+        <div className="flex border-b border-amber-500/10 overflow-x-auto pb-px gap-2 scrollbar-none">
           <button 
             onClick={() => setActiveTab('recommendations')}
-            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'recommendations' ? 'text-purple-300' : 'text-gray-400 hover:text-gray-200'}`}
+            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'recommendations' ? 'text-amber-400' : 'text-gray-400 hover:text-gray-200'}`}
           >
             <span className="relative z-10 flex items-center gap-2 font-sans font-extrabold">
-              <Compass className="w-4 h-4 text-purple-400" />
+              <Compass className="w-4 h-4 text-amber-500" />
               Recomendações
             </span>
             {activeTab === 'recommendations' && (
               <motion.div 
                 layoutId="activeTabUnderline"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-cyan-400"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500"
               />
             )}
           </button>
-
+ 
           <button 
             onClick={() => setActiveTab('library')}
-            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'library' ? 'text-purple-300' : 'text-gray-400 hover:text-gray-200'}`}
+            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'library' ? 'text-orange-400' : 'text-gray-400 hover:text-gray-200'}`}
           >
             <span className="relative z-10 flex items-center gap-2 font-sans font-extrabold">
-              <Layers className="w-4 h-4 text-purple-400" />
+              <Layers className="w-4 h-4 text-orange-400" />
               Biblioteca Steam ({ownedGames.length})
             </span>
             {activeTab === 'library' && (
               <motion.div 
                 layoutId="activeTabUnderline"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-cyan-400"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500"
               />
             )}
           </button>
-
+ 
           {/* New Custom Tab for Manually Added Games */}
           <button 
             onClick={() => setActiveTab('manual')}
-            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'manual' ? 'text-purple-300' : 'text-gray-400 hover:text-gray-200'}`}
+            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'manual' ? 'text-yellow-400' : 'text-gray-400 hover:text-gray-200'}`}
           >
             <span className="relative z-10 flex items-center gap-2 font-sans font-extrabold">
-              <Database className="w-4 h-4 text-amber-400" />
+              <Database className="w-4 h-4 text-yellow-400" />
               Adicionados Manuais ({manualGames.length})
             </span>
             {activeTab === 'manual' && (
               <motion.div 
                 layoutId="activeTabUnderline"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 to-purple-500"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-400"
               />
             )}
           </button>
-
+ 
           <button 
             onClick={() => setActiveTab('discarded')}
-            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'discarded' ? 'text-purple-300' : 'text-gray-400 hover:text-gray-200'}`}
+            className={`relative py-3.5 px-5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer ${activeTab === 'discarded' ? 'text-amber-500' : 'text-gray-400 hover:text-gray-200'}`}
           >
             <span className="relative z-10 flex items-center gap-2 font-sans font-extrabold">
-              <History className="w-4 h-4 text-purple-400" />
+              <History className="w-4 h-4 text-amber-500" />
               Descartados ({discardedRecommendations.length})
             </span>
             {activeTab === 'discarded' && (
               <motion.div 
                 layoutId="activeTabUnderline"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-cyan-400"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-500"
               />
             )}
           </button>
@@ -654,95 +810,103 @@ export default function Dashboard({ user }: { user: User }) {
               <div className="space-y-12">
                 
                 {/* Visual Novel Style Quantum System Console Box */}
-                <div className="bg-[#0f0f16]/90 backdrop-blur-xl p-6 rounded-3xl border border-purple-500/10 flex flex-col md:flex-row items-center md:items-start gap-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-full pointer-events-none" />
+                <div className="bg-[#201815]/90 backdrop-blur-xl p-6 rounded-3xl border border-amber-500/10 flex flex-col md:flex-row items-center md:items-start gap-6 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full pointer-events-none" />
                   
-                  {/* Neon Reactor Orb */}
+                  {/* Cozy fireplace / candle glow */}
                   <div className="relative group shrink-0">
-                    <div className="absolute -inset-1.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-cyan-400 rounded-full blur opacity-60 group-hover:opacity-80 transition duration-300 animate-pulse" />
-                    <div className="relative w-20 h-20 bg-[#07070a] rounded-full overflow-hidden border border-purple-500/30 flex items-center justify-center">
-                      <Cpu className="w-9 h-9 text-purple-400 animate-pulse" />
+                    <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 rounded-full blur opacity-50 group-hover:opacity-70 transition duration-300 animate-pulse" />
+                    <div className="relative w-20 h-20 bg-[#14100e] rounded-full overflow-hidden border border-amber-500/20 flex items-center justify-center">
+                      <Coffee className="w-9 h-9 text-amber-400 animate-bounce" style={{ animationDuration: '3s' }} />
                     </div>
-                    <div className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-purple-600 text-[8px] font-bold text-white rounded-full uppercase border border-purple-400/20 shadow-md font-mono">
-                      CORE-01
+                    <div className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-[8px] font-bold text-white rounded-full uppercase border border-amber-400/20 shadow-md font-mono">
+                      CANTO ☕
                     </div>
                   </div>
 
                   <div className="flex-1 space-y-4 text-center md:text-left">
                     <div className="space-y-1">
                       <div className="flex flex-col sm:flex-row items-center gap-2 justify-center md:justify-start">
-                        <span className="font-extrabold text-lg text-purple-300 uppercase tracking-wider font-mono">Synapse Core System</span>
-                        <div className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 rounded-md text-[9px] font-mono text-purple-300 uppercase tracking-wider flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                          Algoritmo Ativo
+                        <span className="font-extrabold text-lg text-amber-300 uppercase tracking-wider font-serif">Curador de Jogos Synapse</span>
+                        <div className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/25 rounded-md text-[9px] font-mono text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          Espírito Cozy Ativo ✨
                         </div>
                       </div>
                       
                       {/* Dynamic Core messages */}
-                      <p className="text-sm font-medium text-purple-100 leading-relaxed font-mono">
+                      <p className="text-sm font-medium text-amber-100/90 leading-relaxed font-mono">
                         "{getCoreMessage()}"
                       </p>
                     </div>
 
                     {/* Quick core metrics */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                      <div className="bg-[#07070a]/80 p-2.5 rounded-2xl border border-white/5">
-                        <span className="text-[9px] text-gray-500 block uppercase font-mono tracking-wider">Frequência Total</span>
-                        <span className="text-xs font-bold text-purple-300 font-mono">{totalPlaytimeHours}h ouvidas</span>
+                      <div className="bg-[#14100e]/80 p-2.5 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-amber-200/40 block uppercase font-mono tracking-wider">Tempo Dedicado</span>
+                        <span className="text-xs font-bold text-amber-300 font-mono">{totalPlaytimeHours}h jogadas</span>
                       </div>
-                      <div className="bg-[#07070a]/80 p-2.5 rounded-2xl border border-white/5">
-                        <span className="text-[9px] text-gray-500 block uppercase font-mono tracking-wider">Ritmo Recente</span>
-                        <span className="text-xs font-bold text-cyan-400 font-mono">{recentPlaytimeHours}h / 2sem</span>
+                      <div className="bg-[#14100e]/80 p-2.5 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-amber-200/40 block uppercase font-mono tracking-wider">Jogatina Recente</span>
+                        <span className="text-xs font-bold text-orange-400 font-mono">{recentPlaytimeHours}h / 2sem</span>
                       </div>
-                      <div className="bg-[#07070a]/80 p-2.5 rounded-2xl border border-white/5">
-                        <span className="text-[9px] text-gray-500 block uppercase font-mono tracking-wider">Biblioteca Steam</span>
-                        <span className="text-xs font-bold text-gray-300 font-mono">{ownedGames.length} Jogos</span>
+                      <div className="bg-[#14100e]/80 p-2.5 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-amber-200/40 block uppercase font-mono tracking-wider">Biblioteca Steam</span>
+                        <span className="text-xs font-bold text-[#e1dbd2] font-mono">{ownedGames.length} Jogos</span>
                       </div>
-                      <div className="bg-[#07070a]/80 p-2.5 rounded-2xl border border-white/5">
-                        <span className="text-[9px] text-gray-500 block uppercase font-mono tracking-wider">Adicionados Manuais</span>
-                        <span className="text-xs font-bold text-amber-400 font-mono">{manualGames.length} Jogos</span>
+                      <div className="bg-[#14100e]/80 p-2.5 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-amber-200/40 block uppercase font-mono tracking-wider">Registros Manuais</span>
+                        <span className="text-xs font-bold text-yellow-400 font-mono">{manualGames.length} Jogos</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Equalizer Controller calibrator */}
-                <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#0f0f16] to-[#07070a] border border-purple-500/10 p-8 sm:p-10 shadow-2xl">
-                  <div className="absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0.01)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none" />
+                {/* Cozy Clima calibrator */}
+                <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#201815] to-[#14100e] border border-amber-500/15 p-8 sm:p-10 shadow-2xl">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(217,119,6,0.03),transparent_70%)] pointer-events-none" />
                   
                   <div className="relative z-10 max-w-2xl space-y-6">
                     <div className="space-y-2">
-                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-full text-xs font-bold font-mono uppercase tracking-wider">
+                      <div className="inline-flex items-center gap-1 px-3 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full text-xs font-bold font-mono uppercase tracking-wider">
                         <Volume2 className="w-3.5 h-3.5" />
-                        Ajuste de Calibração
+                        Ajuste de Clima 🕯️
                       </div>
-                      <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">O que vamos sintonizar hoje?</h2>
-                      <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
-                        Defina preferências para moldar a rede neural. O mecanismo Synapse analisará seus jogos favoritos juntamente com suas diretrizes para projetar matches cirúrgicos.
+                      <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#f4efe9] font-serif">O que vamos sintonizar hoje?</h2>
+                      <p className="text-xs sm:text-sm text-amber-100/70 leading-relaxed">
+                        Ajuste as preferências abaixo para direcionar nosso curador. O mecanismo analisará seus jogos favoritos juntamente com essas diretrizes para sugerir experiências impecáveis.
                       </p>
                     </div>
                     
-                    <div className="space-y-4 bg-[#07070a]/80 p-5 rounded-2xl border border-white/5">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-bold text-cyan-400 uppercase tracking-wider font-mono">Quero MAIS disso (Filtro Amplificador):</label>
+                    <div className="space-y-4 bg-[#14100e]/80 p-5 rounded-2xl border border-white/5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="space-y-2 font-sans">
+                          <label className="block text-xs font-bold text-amber-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                            Mais disso (Gêneros, mecânicas ou estéticas que quer ver):
+                          </label>
                           <input 
                             type="text" 
                             placeholder="Ex: RPG de Turno, Metroidvania, Rogue-lite"
                             value={prefsMoreOf}
                             onChange={(e) => setPrefsMoreOf(e.target.value)}
-                            className="w-full bg-[#0f0f16] border border-purple-500/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-400 placeholder-gray-600 transition-colors"
+                            className="w-full bg-[#1c1614] border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all font-mono font-medium"
                           />
+                          <p className="text-[10px] text-amber-100/40 leading-normal">Injete gêneros, modos ou estéticas para ver com mais destaque.</p>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider font-mono">Quero MENOS disso (Filtro Atenuador):</label>
+                        <div className="space-y-2 font-sans">
+                          <label className="block text-xs font-bold text-orange-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse shrink-0" />
+                            Menos disso (Estilos ou mecânicas que prefere evitar):
+                          </label>
                           <input 
                             type="text" 
                             placeholder="Ex: FPS frenético, Esporte, Pay-to-win"
                             value={prefsLessOf}
                             onChange={(e) => setPrefsLessOf(e.target.value)}
-                            className="w-full bg-[#0f0f16] border border-purple-500/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-400 placeholder-gray-600 transition-colors"
+                            className="w-full bg-[#1c1614] border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-400 transition-all font-mono font-medium"
                           />
+                          <p className="text-[10px] text-amber-100/40 leading-normal">Oclua modos competitivos estressantes ou estilos que você não queira ver agora.</p>
                         </div>
                       </div>
                     </div>
@@ -751,28 +915,28 @@ export default function Dashboard({ user }: { user: User }) {
                       <button
                         onClick={generateRecommendations}
                         disabled={generating || (combinedTotalGames === 0 && !prefsMoreOf)}
-                        className="flex items-center gap-2.5 bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-black font-black py-3.5 px-8 rounded-xl transition-all disabled:opacity-40 active:scale-95 shadow-lg shadow-purple-500/20 cursor-pointer"
+                        className="flex items-center gap-2.5 bg-gradient-to-r from-amber-500 via-orange-600 to-yellow-500 hover:opacity-95 text-white font-black py-3.5 px-8 rounded-xl transition-all disabled:opacity-40 active:scale-95 shadow-lg shadow-amber-500/20 cursor-pointer"
                       >
                         {generating ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin text-black" />
-                            <span>Projetando Rede Neural...</span>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            <span>Preparando o café com jogos...</span>
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-4 h-4 text-black animate-pulse" />
-                            <span>Sintonizar Recomendações!</span>
+                            <Sparkles className="w-4 h-4 text-white animate-pulse" />
+                            <span>Sintonizar Recomendações! ☕</span>
                           </>
                         )}
                       </button>
 
                       {generating && (
-                        <div className="flex items-center gap-1 h-6 px-4 bg-purple-500/5 border border-purple-500/15 rounded-xl">
-                          <span className="w-1 bg-purple-400 rounded-full animate-bounce h-3" style={{ animationDelay: '0.1s', animationDuration: '0.6s' }} />
-                          <span className="w-1 bg-cyan-400 rounded-full animate-bounce h-5" style={{ animationDelay: '0.3s', animationDuration: '0.5s' }} />
-                          <span className="w-1 bg-purple-400 rounded-full animate-bounce h-4" style={{ animationDelay: '0.2s', animationDuration: '0.7s' }} />
-                          <span className="w-1 bg-cyan-400 rounded-full animate-bounce h-2" style={{ animationDelay: '0.4s', animationDuration: '0.4s' }} />
-                          <span className="text-[10px] font-mono text-purple-400 ml-2">Analisando sinapses...</span>
+                        <div className="flex items-center gap-1 h-6 px-4 bg-amber-500/5 border border-amber-500/15 rounded-xl">
+                          <span className="w-1 bg-amber-400 rounded-full animate-bounce h-3" style={{ animationDelay: '0.1s', animationDuration: '0.6s' }} />
+                          <span className="w-1 bg-orange-400 rounded-full animate-bounce h-5" style={{ animationDelay: '0.3s', animationDuration: '0.5s' }} />
+                          <span className="w-1 bg-yellow-400 rounded-full animate-bounce h-4" style={{ animationDelay: '0.2s', animationDuration: '0.7s' }} />
+                          <span className="w-1 bg-amber-300 rounded-full animate-bounce h-2" style={{ animationDelay: '0.4s', animationDuration: '0.4s' }} />
+                          <span className="text-[10px] font-mono text-amber-400 ml-2">Moendo grãos de ideias...</span>
                         </div>
                       )}
                     </div>
@@ -785,7 +949,7 @@ export default function Dashboard({ user }: { user: User }) {
                     )}
                   </div>
                   
-                  <div className="absolute top-0 right-0 w-1/2 h-full bg-purple-500/5 -skew-x-12 transform origin-top translate-x-1/4 pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-1/2 h-full bg-amber-500/5 -skew-x-12 transform origin-top translate-x-1/4 pointer-events-none" />
                 </section>
 
                 {/* Recommendations List Container */}
@@ -798,11 +962,11 @@ export default function Dashboard({ user }: { user: User }) {
                       className="space-y-6"
                     >
                       <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                        <h3 className="text-lg font-extrabold flex items-center gap-2 font-sans tracking-wide">
-                          <Sparkles className="w-5 h-5 text-purple-400 animate-spin" style={{ animationDuration: '6s' }} />
-                          Matches Ativos do Sistema
+                        <h3 className="text-lg font-bold flex items-center gap-2 font-serif tracking-wide text-amber-200">
+                          <Sparkles className="w-5 h-5 text-amber-400 animate-spin" style={{ animationDuration: '6s' }} />
+                          Sua Seleção de Jogos Customizada
                         </h3>
-                        <span className="text-xs text-purple-400 font-mono tracking-widest uppercase">Calculado em Tempo Real</span>
+                        <span className="text-xs text-amber-400/60 font-mono tracking-widest uppercase">Parceria com a IA</span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <AnimatePresence>
@@ -827,8 +991,8 @@ export default function Dashboard({ user }: { user: User }) {
                 {/* Recent Steam Activity History */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <section className="lg:col-span-2 space-y-6">
-                    <h3 className="text-lg font-extrabold flex items-center gap-2">
-                      <History className="w-5 h-5 text-purple-400" />
+                    <h3 className="text-lg font-bold flex items-center gap-2 font-serif text-amber-200">
+                      <History className="w-5 h-5 text-amber-400" />
                       Atividade Recente da Steam
                     </h3>
                     
@@ -838,7 +1002,7 @@ export default function Dashboard({ user }: { user: User }) {
                           <div 
                             key={game.appid} 
                             onClick={() => handleRecommendSimilar(game.name)}
-                            className="group flex items-center gap-4 bg-[#0f0f16]/60 p-4 rounded-2xl border border-white/5 hover:bg-[#0f0f16] hover:border-purple-500/30 transition-all cursor-pointer relative overflow-hidden shadow-md"
+                            className="group flex items-center gap-4 bg-[#201815]/60 p-4 rounded-2xl border border-amber-500/10 hover:bg-[#201815] hover:border-amber-500/30 transition-all cursor-pointer relative overflow-hidden shadow-md"
                             title="Ver jogos similares"
                           >
                              <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-400">
@@ -848,28 +1012,28 @@ export default function Dashboard({ user }: { user: User }) {
                              <div className="w-14 h-14 bg-black/30 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-inner border border-white/5">
                               {game.img_icon_url ? (
                                 <img src={`https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} alt={game.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Gamepad2 className="w-6 h-6 text-purple-400/40" />
+                               ) : (
+                                 <Gamepad2 className="w-6 h-6 text-amber-500/40" />
                               )}
                              </div>
                              <div className="flex-1 min-w-0">
-                               <h4 className="font-extrabold text-sm sm:text-base truncate text-gray-200 group-hover:text-purple-400 transition-colors">{game.name}</h4>
-                               <p className="text-xs text-purple-400 font-mono mt-0.5">
-                                 {game.playtime_2weeks ? `${(game.playtime_2weeks / 60).toFixed(1)}h` : '< 1h'} <span className="text-gray-500 font-normal">nas últimas 2 semanas</span>
+                               <h4 className="font-bold text-sm sm:text-base truncate text-gray-200 group-hover:text-amber-400 transition-colors font-serif">{game.name}</h4>
+                               <p className="text-xs text-amber-400 font-mono mt-0.5">
+                                 {game.playtime_2weeks ? `${(game.playtime_2weeks / 60).toFixed(1)}h` : '< 1h'} <span className="text-amber-100/50 font-normal">nas últimas 2 semanas</span>
                                </p>
                              </div>
-                             <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+                             <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="bg-[#0f0f16]/40 border border-white/5 p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-3">
-                        <div className="w-12 h-12 bg-purple-500/10 rounded-full flex items-center justify-center text-purple-400/60">
+                      <div className="bg-[#201815]/40 border border-amber-500/10 p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-3">
+                        <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-400/60">
                           <Gamepad2 className="w-6 h-6" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-gray-300 text-sm">Nenhuma atividade recente</h4>
-                          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed font-mono">
+                          <h4 className="font-bold text-amber-200 text-sm font-serif">Nenhuma atividade recente</h4>
+                          <p className="text-xs text-amber-100/50 mt-1 max-w-sm mx-auto leading-relaxed font-mono">
                             {isProfilePrivate 
                               ? "Perfil configurado como privado. Ative a publicidade nos detalhes de privacidade da Steam para sincronizar."
                               : "Nenhum histórico de jogo capturado nas duas últimas semanas."}
@@ -879,34 +1043,130 @@ export default function Dashboard({ user }: { user: User }) {
                     )}
                   </section>
 
-                  {/* Equalizer Profile Metrics */}
+                  {/* Profile Metrics and AI Gamer Archetype */}
                   <section className="space-y-6">
-                    <h3 className="text-lg font-extrabold flex items-center gap-2">
-                      <Volume2 className="w-5 h-5 text-cyan-400" />
-                      Assinatura de Tempo
-                    </h3>
-                    <div className="bg-[#0f0f16]/60 p-6 rounded-3xl border border-white/5 space-y-6 shadow-md">
-                      <div className="flex justify-between items-center pb-3 border-b border-white/5">
-                        <span className="text-gray-400 text-xs uppercase tracking-wider font-mono">Total de Jogos</span>
-                        <span className="text-xl font-extrabold text-purple-300 font-mono">{combinedTotalGames}</span>
-                      </div>
-                      <div className="space-y-3">
-                        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Frequência Máxima (Seus Destaques)</p>
-                        <div className="space-y-3">
-                          {[...manualGames, ...ownedGames]
-                            .sort((a, b) => b.playtime_forever - a.playtime_forever)
-                            .slice(0, 3)
-                            .map((game, idx) => (
-                              <div 
-                                key={game.appid || game.name + idx} 
-                                className="flex justify-between items-center text-xs cursor-pointer group hover:bg-purple-500/5 p-1.5 -mx-1.5 rounded-lg border border-transparent hover:border-purple-500/10 transition-all" 
-                                onClick={() => handleRecommendSimilar(game.name)} 
-                                title="Ver similares"
-                              >
-                                <span className="text-gray-300 truncate max-w-[150px] font-medium group-hover:text-purple-400 transition-colors font-mono">{game.name}</span>
-                                <span className="text-purple-300 font-mono text-xs">{Math.round(game.playtime_forever / 60)}h</span>
+                    {/* Dynamic Archetype Analysis Card */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold flex items-center gap-2 font-serif text-amber-200">
+                        <Award className="w-5 h-5 text-amber-400 animate-pulse" />
+                        Arquétipo de Jogador
+                      </h3>
+                      
+                      {(() => {
+                        const archetype = getGamerArchetype();
+                        return (
+                          <div className="bg-gradient-to-b from-[#201815] to-[#14100e] p-6 rounded-3xl border border-amber-500/10 shadow-xl relative overflow-hidden group">
+                            {/* Accent lighting glow */}
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/5 via-amber-600/5 to-transparent rounded-bl-full pointer-events-none" />
+                            
+                            <div className="space-y-4 relative z-10">
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-extrabold font-mono text-amber-400 uppercase tracking-widest block font-serif">Análise de Gosto</span>
+                                <h4 className={`text-base font-black tracking-wide uppercase ${archetype.accentText}`}>
+                                  {archetype.title}
+                                </h4>
+                                <p className="text-xs text-amber-100/70 leading-relaxed font-mono">
+                                  {archetype.description}
+                                </p>
                               </div>
-                            ))}
+
+                              {/* Progress Stats */}
+                              <div className="space-y-2.5 pt-2 border-t border-white/5">
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[10px] font-mono">
+                                    <span className="text-amber-300 font-bold">Foco Narrativo (RPG)</span>
+                                    <span className="text-gray-400">{archetype.metrics.focus}%</span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
+                                    <motion.div 
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${archetype.metrics.focus}%` }}
+                                      transition={{ duration: 1, ease: "easeOut" }}
+                                      className="h-full bg-amber-500 rounded-full" 
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[10px] font-mono">
+                                    <span className="text-orange-300 font-bold">Estratégia e Tática</span>
+                                    <span className="text-gray-400">{archetype.metrics.tactic}%</span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
+                                    <motion.div 
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${archetype.metrics.tactic}%` }}
+                                      transition={{ duration: 1, ease: "easeOut", delay: 0.1 }}
+                                      className="h-full bg-orange-500 rounded-full" 
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[10px] font-mono">
+                                    <span className="text-[#f59e0b] font-bold">Desafio & Ação</span>
+                                    <span className="text-gray-400">{archetype.metrics.explore}%</span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
+                                    <motion.div 
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${archetype.metrics.explore}%` }}
+                                      transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+                                      className="h-full bg-amber-500 rounded-full" 
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[10px] font-mono">
+                                    <span className="text-yellow-400 font-bold">Exploração / Cozy</span>
+                                    <span className="text-gray-400">{archetype.metrics.cozy}%</span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
+                                    <motion.div 
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${archetype.metrics.cozy}%` }}
+                                      transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+                                      className="h-full bg-yellow-500 rounded-full" 
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Time Signature list */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold flex items-center gap-2 font-serif text-amber-200">
+                        <History className="w-5 h-5 text-amber-400" />
+                        Assinatura de Tempo
+                      </h3>
+                      <div className="bg-[#201815]/60 p-6 rounded-3xl border border-amber-500/10 space-y-6 shadow-md">
+                        <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                          <span className="text-amber-100/40 text-xs uppercase tracking-wider font-mono">Total de Jogos</span>
+                          <span className="text-xl font-extrabold text-amber-400 font-mono">{combinedTotalGames}</span>
+                        </div>
+                        <div className="space-y-3">
+                          <p className="text-[9px] font-bold text-amber-400 uppercase tracking-wider font-mono">Frequência Máxima (Seus Destaques)</p>
+                          <div className="space-y-3">
+                            {[...manualGames, ...ownedGames]
+                              .sort((a, b) => b.playtime_forever - a.playtime_forever)
+                              .slice(0, 4)
+                              .map((game, idx) => (
+                                <div 
+                                  key={game.appid || game.name + idx} 
+                                  className="flex justify-between items-center text-xs cursor-pointer group hover:bg-amber-500/5 p-1.5 -mx-1.5 rounded-lg border border-transparent hover:border-amber-500/10 transition-all" 
+                                  onClick={() => handleRecommendSimilar(game.name)} 
+                                  title="Ver similares"
+                                >
+                                  <span className="text-gray-300 truncate max-w-[150px] font-medium group-hover:text-amber-400 transition-colors font-mono">{game.name}</span>
+                                  <span className="text-amber-400 font-mono text-xs font-bold">{Math.round(game.playtime_forever / 60)}h</span>
+                                </div>
+                              ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -920,20 +1180,20 @@ export default function Dashboard({ user }: { user: User }) {
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
                   <div className="space-y-1">
-                    <h3 className="text-lg font-extrabold">Seu Catálogo ({combinedLibraryGames.length})</h3>
-                    <p className="text-xs text-gray-400">Pressione qualquer título para obter recomendações equivalentes baseadas nos parâmetros de rede neural.</p>
+                    <h3 className="text-lg font-bold font-serif text-amber-200">Seu Catálogo ({combinedLibraryGames.length})</h3>
+                    <p className="text-xs text-amber-100/60 font-mono">Pressione qualquer título para obter recomendações equivalentes baseadas nos seus parâmetros de gosto e clima.</p>
                   </div>
                   
                   {/* Search box filters */}
                   <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/40" />
                       <input 
                         type="text" 
                         value={librarySearchFilter}
                         onChange={(e) => setLibrarySearchFilter(e.target.value)}
                         placeholder="Filtrar biblioteca..."
-                        className="bg-[#0f0f16] border border-purple-500/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400 w-full sm:w-48 placeholder-gray-600 font-mono"
+                        className="bg-[#201815] border border-amber-500/20 rounded-xl pl-9 pr-3 py-1.5 text-xs text-[#f4efe9] focus:outline-none focus:border-amber-400 w-full sm:w-48 placeholder-amber-100/30 font-mono"
                       />
                     </div>
                     
@@ -943,12 +1203,12 @@ export default function Dashboard({ user }: { user: User }) {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Injetar App ID/Título..."
-                        className="bg-[#0f0f16] border border-purple-500/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400 flex-1 sm:w-44 placeholder-gray-600 font-mono"
+                        className="bg-[#201815] border border-amber-500/20 rounded-xl px-3 py-1.5 text-xs text-[#f4efe9] focus:outline-none focus:border-amber-400 flex-1 sm:w-44 placeholder-amber-100/30 font-mono"
                       />
                       <button 
                         type="submit"
                         disabled={searching || !searchQuery}
-                        className="bg-gradient-to-r from-purple-500 to-cyan-400 text-black hover:opacity-90 px-4 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+                        className="bg-amber-600 text-white hover:bg-amber-700 active:scale-95 px-4 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 transition-all flex items-center gap-1 shrink-0 cursor-pointer"
                       >
                         {searching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                         <span>Buscar</span>
@@ -960,7 +1220,7 @@ export default function Dashboard({ user }: { user: User }) {
                 {searchResults.length > 0 && (
                   <div className="bg-[#0f0f16]/90 border border-purple-500/20 p-4 rounded-2xl space-y-3 shadow-lg">
                     <h4 className="text-xs font-extrabold text-gray-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                       Resultados Steam Detectados:
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -969,7 +1229,7 @@ export default function Dashboard({ user }: { user: User }) {
                           <span className="text-xs truncate mr-2 font-medium font-mono">{app.name}</span>
                           <button 
                             onClick={() => handleAddGame(app)}
-                            className="bg-purple-500/15 hover:bg-purple-500 hover:text-black text-purple-300 px-3 py-1 rounded-lg text-xs font-bold transition-all border border-purple-500/20 active:scale-95 cursor-pointer"
+                            className="bg-amber-500/15 hover:bg-amber-500 hover:text-black text-amber-300 px-3 py-1 rounded-lg text-xs font-bold transition-all border border-amber-500/20 active:scale-95 cursor-pointer"
                           >
                             Adicionar à Biblioteca
                           </button>
@@ -980,10 +1240,10 @@ export default function Dashboard({ user }: { user: User }) {
                 )}
 
                 {filteredLibraryGames.length === 0 ? (
-                  <div className="bg-[#0f0f16]/40 border border-white/5 p-12 rounded-3xl text-center max-w-md mx-auto space-y-3">
-                    <p className="text-gray-400 text-sm">Nenhum registro encontrado com a filtragem aplicada.</p>
+                  <div className="bg-[#201815]/40 border border-amber-500/10 p-12 rounded-3xl text-center max-w-md mx-auto space-y-3">
+                    <p className="text-amber-100/60 text-sm">Nenhum registro encontrado com a filtragem aplicada.</p>
                     {librarySearchFilter && (
-                      <button onClick={() => setLibrarySearchFilter('')} className="text-purple-400 font-bold text-xs underline cursor-pointer">Limpar busca</button>
+                      <button onClick={() => setLibrarySearchFilter('')} className="text-amber-400 font-bold text-xs underline cursor-pointer">Limpar busca</button>
                     )}
                   </div>
                 ) : (
@@ -993,7 +1253,7 @@ export default function Dashboard({ user }: { user: User }) {
                       .map(game => (
                         <div 
                           key={game.appid} 
-                          className="bg-[#0f0f16]/60 border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#0f0f16] hover:border-purple-500/30 transition-all group relative overflow-hidden h-36"
+                          className="bg-[#201815]/60 border border-amber-500/10 p-4 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#201815] hover:border-amber-500/30 transition-all group relative overflow-hidden h-36"
                           onClick={() => handleRecommendSimilar(game.name)}
                           title="Encontrar jogos similares"
                         >
@@ -1001,8 +1261,8 @@ export default function Dashboard({ user }: { user: User }) {
                           {game.isManual && (
                             <button
                               onClick={(e) => {
-                                e.stopPropagation(); // prevent find similar trigger
-                                handleRemoveManualGame(game.appid);
+                                  e.stopPropagation(); // prevent find similar trigger
+                                  handleRemoveManualGame(game.appid);
                               }}
                               className="absolute top-2 right-2 p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 rounded-lg transition-all z-10 border border-red-500/20 cursor-pointer"
                               title="Remover Jogo Manual"
@@ -1016,12 +1276,12 @@ export default function Dashboard({ user }: { user: User }) {
                               Manual
                             </div>
                           ) : (
-                            <div className="absolute right-2 top-2 p-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-md text-[8px] font-mono opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-wider font-bold">
+                            <div className="absolute right-2 top-2 p-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-md text-[8px] font-mono opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-wider font-bold">
                               Sintonizar
                             </div>
                           )}
 
-                          <div className="w-12 h-12 bg-black/30 rounded-xl flex items-center justify-center overflow-hidden mb-2 border border-white/5 shadow-inner mt-2">
+                          <div className="w-12 h-12 bg-black/30 rounded-xl flex items-center justify-center overflow-hidden mb-2 border border-amber-500/10 shadow-inner mt-2">
                             {game.isManual && game.appid > 0 ? (
                               <img 
                                 src={`https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`} 
@@ -1032,12 +1292,12 @@ export default function Dashboard({ user }: { user: User }) {
                             ) : game.img_icon_url ? (
                               <img src={`https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} alt={game.name} className="w-full h-full object-cover" />
                             ) : (
-                              <Gamepad2 className="w-6 h-6 text-purple-400/30" />
+                              <Gamepad2 className="w-6 h-6 text-amber-500/30" />
                             )}
                           </div>
-                          <span className="font-extrabold text-gray-200 text-xs sm:text-sm group-hover:text-purple-400 transition-colors truncate max-w-full px-2 font-mono">{game.name}</span>
+                          <span className="font-bold text-[#f4efe9] text-xs sm:text-sm group-hover:text-amber-400 transition-colors truncate max-w-full px-2 font-serif">{game.name}</span>
                           {game.playtime_forever > 0 && (
-                             <span className="text-[9px] text-gray-500 mt-1 font-mono">{Math.round(game.playtime_forever / 60)}h registradas</span>
+                             <span className="text-[9px] text-amber-200/50 mt-1 font-mono">{Math.round(game.playtime_forever / 60)}h registradas</span>
                           )}
                         </div>
                     ))}
@@ -1069,28 +1329,28 @@ export default function Dashboard({ user }: { user: User }) {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   
                   {/* Manual Creation Input panel */}
-                  <form onSubmit={handleAddManualGameSubmit} className="bg-[#0f0f16]/70 border border-purple-500/10 p-6 rounded-3xl space-y-5 h-fit shadow-md">
-                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-widest font-mono flex items-center gap-2">
+                  <form onSubmit={handleAddManualGameSubmit} className="bg-[#201815]/70 border border-amber-500/10 p-6 rounded-3xl space-y-5 h-fit shadow-md">
+                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-widest font-serif flex items-center gap-2">
                       <Plus className="w-4 h-4" />
                       Injetar Jogo Manual
                     </h4>
 
                     {/* Step 1: Search Steam to Auto-resolve Cover */}
                     <div className="space-y-2">
-                      <label className="block text-[10px] font-extrabold text-purple-300 uppercase tracking-wider font-mono">1. Buscar capa na Steam (Recomendado):</label>
+                      <label className="block text-[10px] font-extrabold text-amber-300 uppercase tracking-widest font-mono">1. Buscar capa na Steam (Recomendado):</label>
                       <div className="flex gap-2">
                         <input 
                           type="text" 
                           value={manualSearchQuery}
                           onChange={(e) => setManualSearchQuery(e.target.value)}
                           placeholder="Ex: Elden Ring..."
-                          className="flex-1 bg-[#07070a] border border-purple-500/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-400 font-mono"
+                          className="flex-1 bg-[#14100e] border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-white placeholder-amber-100/30 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 font-mono transition-all"
                         />
                         <button 
                           type="button"
                           onClick={handleSearchManualGame}
                           disabled={isSearchingManual || !manualSearchQuery}
-                          className="px-3 bg-purple-500/15 hover:bg-purple-500 hover:text-black border border-purple-500/30 text-purple-300 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center justify-center cursor-pointer"
+                          className="px-4 bg-amber-500/10 hover:bg-amber-500 hover:text-black border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center justify-center cursor-pointer"
                         >
                           {isSearchingManual ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                         </button>
@@ -1104,7 +1364,7 @@ export default function Dashboard({ user }: { user: User }) {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="bg-[#07070a] border border-purple-500/15 p-3 rounded-xl max-h-40 overflow-y-auto space-y-1.5 scrollbar-thin"
+                          className="bg-[#07070a] border border-amber-500/15 p-3 rounded-xl max-h-40 overflow-y-auto space-y-1.5 scrollbar-thin"
                         >
                           <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 uppercase border-b border-white/5 pb-1 mb-1">
                             <span>Selecione para Autocompletar:</span>
@@ -1114,7 +1374,7 @@ export default function Dashboard({ user }: { user: User }) {
                             <div 
                               key={app.id} 
                               onClick={() => handleSelectManualSearchResult(app)}
-                              className="text-xs py-1 px-2 hover:bg-purple-500/10 rounded text-gray-300 hover:text-purple-300 cursor-pointer font-mono truncate"
+                              className="text-xs py-1 px-2 hover:bg-amber-500/10 rounded text-gray-300 hover:text-amber-300 cursor-pointer font-mono truncate"
                             >
                               {app.name} <span className="text-[9px] text-gray-500">(ID: {app.id})</span>
                             </div>
@@ -1126,18 +1386,18 @@ export default function Dashboard({ user }: { user: User }) {
                     <div className="border-t border-white/5 pt-4 space-y-4">
                       {/* Name input */}
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider font-mono">Nome do Jogo (Obrigatório):</label>
+                        <label className="block text-[10px] font-bold text-amber-200 uppercase tracking-widest font-mono">Nome do Jogo (Obrigatório):</label>
                         <input 
                           type="text" 
                           required
                           value={manualGameName}
                           onChange={(e) => setManualGameName(e.target.value)}
                           placeholder="Ex: Minecraft..."
-                          className="w-full bg-[#07070a] border border-purple-500/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-400 font-mono font-bold"
+                          className="w-full bg-[#14100e] border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-[#f4efe9] placeholder-amber-100/30 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 font-mono font-bold transition-all"
                         />
                         {manualAppId && (
-                          <p className="text-[9px] font-mono text-cyan-400 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                          <p className="text-[9px] font-mono text-amber-400 flex items-center gap-1 mt-1 font-serif">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                             Capa e ID {manualAppId} vinculados com sucesso!
                           </p>
                         )}
@@ -1145,7 +1405,7 @@ export default function Dashboard({ user }: { user: User }) {
 
                       {/* Hours input */}
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider font-mono">Horas Jogadas (Opcional):</label>
+                        <label className="block text-[10px] font-bold text-amber-200 uppercase tracking-widest font-mono">Horas Jogadas (Opcional):</label>
                         <input 
                           type="number" 
                           min="0"
@@ -1153,7 +1413,7 @@ export default function Dashboard({ user }: { user: User }) {
                           value={manualGameHours}
                           onChange={(e) => setManualGameHours(e.target.value)}
                           placeholder="Ex: 120.5..."
-                          className="w-full bg-[#07070a] border border-purple-500/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-400 font-mono"
+                          className="w-full bg-[#14100e] border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-[#f4efe9] placeholder-amber-100/30 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 font-mono transition-all"
                         />
                       </div>
                     </div>
@@ -1161,25 +1421,25 @@ export default function Dashboard({ user }: { user: User }) {
                     <button
                       type="submit"
                       disabled={!manualGameName}
-                      className="w-full bg-gradient-to-r from-amber-500 to-purple-500 text-black py-3 rounded-xl font-extrabold text-xs tracking-wider uppercase disabled:opacity-40 active:scale-95 transition-all shadow-md hover:opacity-95 shadow-amber-500/10 cursor-pointer"
+                      className="w-full bg-amber-600 text-[#f4efe9] py-3 rounded-xl font-bold text-xs tracking-wider uppercase disabled:opacity-40 active:scale-95 transition-all shadow-md hover:bg-amber-700 cursor-pointer"
                     >
-                      Injetar no Banco de Dados
+                      Injetar no Catálogo
                     </button>
                   </form>
 
                   {/* Manual List Output */}
                   <div className="lg:col-span-2 space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                      <h4 className="text-sm font-extrabold font-sans">Seus Jogos Cadastrados ({manualGames.length})</h4>
-                      <p className="text-[10px] text-gray-500 font-mono">Registros duráveis em cache local</p>
+                      <h4 className="text-sm font-bold font-serif text-amber-200">Seus Jogos Cadastrados ({manualGames.length})</h4>
+                      <p className="text-[10px] text-amber-100/40 font-mono">Registros duráveis em cache local</p>
                     </div>
 
                     {manualGames.length === 0 ? (
-                      <div className="bg-[#0f0f16]/40 border border-white/5 p-12 rounded-3xl text-center space-y-3">
-                        <Database className="w-8 h-8 text-purple-500/40 mx-auto" />
+                      <div className="bg-[#201815]/40 border border-amber-500/10 p-12 rounded-3xl text-center space-y-3">
+                        <Database className="w-8 h-8 text-amber-500/40 mx-auto" />
                         <div>
-                          <p className="text-gray-400 text-xs">Nenhum jogo inserido manualmente ainda.</p>
-                          <p className="text-[10px] text-gray-600 mt-1 max-w-sm mx-auto font-mono">Injete acima para enriquecer suas diretrizes de IA caso sua conta Steam esteja oculta ou incompleta!</p>
+                          <p className="text-amber-100/60 text-xs">Nenhum jogo inserido manualmente ainda.</p>
+                          <p className="text-[10px] text-amber-100/30 mt-1 max-w-sm mx-auto font-mono">Injete acima para enriquecer suas diretrizes de IA caso sua conta Steam esteja oculta ou incompleta!</p>
                         </div>
                       </div>
                     ) : (
@@ -1211,16 +1471,16 @@ export default function Dashboard({ user }: { user: User }) {
             {activeTab === 'discarded' && (
               <div className="space-y-6">
                 <div className="space-y-1 border-b border-white/5 pb-4">
-                  <h3 className="text-lg font-extrabold flex items-center gap-2">
-                    <History className="w-5 h-5 text-gray-400" />
-                    Sinapses Descartadas
+                  <h3 className="text-lg font-bold flex items-center gap-2 font-serif text-amber-200">
+                    <History className="w-5 h-5 text-amber-400" />
+                    Recomendações Ocultadas
                   </h3>
-                  <p className="text-xs text-gray-400">Jogos que você retirou das recomendações ativas. Pressione o botão circular de restauração para reinseri-los no pipeline de afinidade.</p>
+                  <p className="text-xs text-amber-100/60 font-mono">Jogos que você retirou das recomendações ativas. Pressione o botão circular de restauração para reinseri-los nas recomendações futuras.</p>
                 </div>
                 
                 {discardedRecommendations.length === 0 ? (
-                  <div className="bg-[#0f0f16]/40 border border-white/5 p-12 rounded-3xl text-center max-w-md mx-auto">
-                    <p className="text-gray-400 text-sm">Nenhum registro descartado sob o cache ativo.</p>
+                  <div className="bg-[#201815]/40 border border-amber-500/10 p-12 rounded-3xl text-center max-w-md mx-auto">
+                    <p className="text-amber-100/60 text-sm">Nenhum registro descartado sob o cache ativo.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1234,7 +1494,7 @@ export default function Dashboard({ user }: { user: User }) {
                             match={rec.estimatedMatch}
                             genres={rec.genres}
                             onDiscard={() => handleRestore(i)}
-                            discardIcon={<History className="w-3.5 h-3.5 text-cyan-400" />}
+                            discardIcon={<History className="w-3.5 h-3.5 text-amber-400" />}
                             discardLabel="Restaurar recomendação"
                           />
                         </motion.div>
