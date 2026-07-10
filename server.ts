@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import passport from "passport";
 import { Strategy as SteamStrategy } from "passport-steam";
@@ -162,6 +163,48 @@ async function startServer() {
     req.logout(() => {
       res.redirect('/');
     });
+  });
+
+  // Simple persistent store for manual games
+  const MANUAL_GAMES_FILE = path.join(process.cwd(), "manual_games_store.json");
+
+  function readManualGamesStore(): Record<string, any[]> {
+    try {
+      if (fs.existsSync(MANUAL_GAMES_FILE)) {
+        const data = fs.readFileSync(MANUAL_GAMES_FILE, 'utf-8');
+        return JSON.parse(data);
+      }
+    } catch (e) {
+      console.error("Failed to read manual games store:", e);
+    }
+    return {};
+  }
+
+  function writeManualGamesStore(store: Record<string, any[]>) {
+    try {
+      fs.writeFileSync(MANUAL_GAMES_FILE, JSON.stringify(store, null, 2), 'utf-8');
+    } catch (e) {
+      console.error("Failed to write manual games store:", e);
+    }
+  }
+
+  app.get('/api/steam/manual-games', checkAuth, (req: any, res: any) => {
+    const steamId = req.user.id;
+    const store = readManualGamesStore();
+    const games = store[steamId] || [];
+    res.json({ games });
+  });
+
+  app.post('/api/steam/manual-games', checkAuth, (req: any, res: any) => {
+    const steamId = req.user.id;
+    const { games } = req.body;
+    if (!Array.isArray(games)) {
+      return res.status(400).json({ error: "Invalid games format" });
+    }
+    const store = readManualGamesStore();
+    store[steamId] = games;
+    writeManualGamesStore(store);
+    res.json({ success: true });
   });
 
   // Steam Data fetching

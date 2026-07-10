@@ -4,6 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
+    <script>
+      // Workaround for browser/iframe environments where window.fetch is a read-only getter.
+      // This prevents errors when external tools, extensions, or diagnostic scripts try to override window.fetch.
+      (function() {
+        try {
+          const desc = Object.getOwnPropertyDescriptor(window, 'fetch') || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'fetch');
+          if (desc && (!desc.writable || !desc.set)) {
+            let currentFetch = window.fetch;
+            Object.defineProperty(window, 'fetch', {
+              get() {
+                return currentFetch;
+              },
+              set(newFetch) {
+                currentFetch = newFetch;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          console.warn("Could not patch window.fetch getter:", e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
